@@ -1,0 +1,13 @@
+{
+  "name": "tribun360-v64-vercel-apk",
+  "version": "6.4.0",
+  "private": true,
+  "description": "Npm paketi gerektirmeyen Canli Mac Merkezi Node.js sunucusu",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
