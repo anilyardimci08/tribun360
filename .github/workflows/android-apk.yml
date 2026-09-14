@@ -1,0 +1,53 @@
+name: Build tribün360 Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      web_url:
+        description: 'tribün360 web adresi'
+        required: true
+        default: 'https://tribun360.vercel.app/'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Check Android project
+        run: |
+          echo "Android klasoru kontrol ediliyor..."
+          ls -la
+          ls -la android
+          ls -la android/app
+
+      - name: Create Gradle wrapper
+        working-directory: android
+        run: gradle wrapper --gradle-version 8.9
+
+      - name: Build tribün360 APK
+        working-directory: android
+        run: ./gradlew assembleDebug -PTRIBUN360_URL="${{ inputs.web_url }}"
+
+      - name: Prepare APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk tribun360.apk
+
+      - name: Upload tribün360 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tribun360-android-apk
+          path: tribun360.apk
+          if-no-files-found: error
