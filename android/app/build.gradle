@@ -1,0 +1,24 @@
+plugins { id 'com.android.application' }
+
+android {
+    buildFeatures { buildConfig true }
+    namespace 'com.tribun360.app'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.tribun360.app'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+        buildConfigField 'String', 'TRIBUN360_URL', '"https://example.com"'
+    }
+
+    buildTypes {
+        debug { debuggable true }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
