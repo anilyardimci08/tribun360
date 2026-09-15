@@ -1,17 +1,23 @@
-name: Build tribün360 Android APK
+name: Build and publish tribün360 APK
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-apk.yml'
   workflow_dispatch:
-    inputs:
-      web_url:
-        description: 'tribün360 web adresi'
-        required: true
-        default: 'https://tribun360.vercel.app/'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tribun360-apk-release
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,27 +33,27 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Check Android project
-        run: |
-          echo "Android klasoru kontrol ediliyor..."
-          ls -la
-          ls -la android
-          ls -la android/app
-
       - name: Create Gradle wrapper
         working-directory: android
         run: gradle wrapper --gradle-version 8.9
 
-      - name: Build tribün360 APK
+      - name: Build APK
         working-directory: android
-        run: ./gradlew assembleDebug -PTRIBUN360_URL="${{ inputs.web_url }}"
+        run: ./gradlew assembleDebug
 
       - name: Prepare APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk tribun360.apk
 
-      - name: Upload tribün360 APK
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: tribun360-android-apk
           path: tribun360.apk
           if-no-files-found: error
+
+      - name: Publish stable latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --cleanup-tag -y || true
+          gh release create latest tribun360.apk --title "tribün360 Son Sürüm" --notes "main dalındaki en güncel otomatik Android APK derlemesi."
