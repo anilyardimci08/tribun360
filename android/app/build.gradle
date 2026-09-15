@@ -9,16 +9,35 @@ android {
         applicationId 'com.tribun360.app'
         minSdk 24
         targetSdk 35
-        versionCode 2
-        versionName '1.0.1'
-        buildConfigField 'String', 'TRIBUN360_URL', '"https://tribun360-v64-vercel-apk.vercel.app/"'
+        versionCode 3
+        versionName '1.1.0'
+        buildConfigField 'String', 'TRIBUN360_URL', '"https://tribun360.vercel.app/"'
+    }
+
+    signingConfigs {
+        release {
+            def store = project.findProperty('TRIBUN360_STORE_FILE')
+            if (store) {
+                storeFile file(store)
+                storePassword project.findProperty('TRIBUN360_STORE_PASSWORD')
+                keyAlias project.findProperty('TRIBUN360_KEY_ALIAS')
+                keyPassword project.findProperty('TRIBUN360_KEY_PASSWORD')
+            }
+        }
     }
 
     buildTypes {
-        debug { debuggable true }
+        debug {
+            debuggable true
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
         release {
-            minifyEnabled false
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (project.findProperty('TRIBUN360_STORE_FILE')) signingConfig signingConfigs.release
         }
     }
 }
