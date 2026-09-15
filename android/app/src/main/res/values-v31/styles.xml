@@ -1,0 +1,12 @@
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:navigationBarColor">#05080D</item>
+        <item name="android:statusBarColor">#05080D</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowSplashScreenBackground">#05080D</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/tribun360_icon</item>
+        <item name="android:windowSplashScreenAnimationDuration">350</item>
+        <item name="android:colorAccent">#2196F3</item>
+    </style>
+</resources>
