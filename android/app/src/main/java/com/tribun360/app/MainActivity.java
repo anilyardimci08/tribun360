@@ -8,6 +8,12 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.graphics.Bitmap;
+import android.net.http.SslError;
+import android.webkit.SslErrorHandler;
+import android.webkit.WebResourceResponse;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -31,6 +37,10 @@ public class MainActivity extends Activity {
     private WebView webView;
     private ProgressBar progress;
     private LinearLayout errorView;
+    private TextView errorMessage;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private boolean loadFailed;
+    private final Runnable loadTimeout = () -> showError("Sayfa zamanında yüklenemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.");
     private float touchDownY;
     private final Uri appUri = Uri.parse(BuildConfig.TRIBUN360_URL);
 
@@ -40,8 +50,10 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(Color.rgb(5, 8, 13));
         buildUi();
         configureWebView();
-        if (savedInstanceState == null) webView.loadUrl(BuildConfig.TRIBUN360_URL);
-        else webView.restoreState(savedInstanceState);
+        if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null
+                || webView.getUrl() == null || savedInstanceState.getBoolean("loadFailed", false)) {
+            retry();
+        }
     }
 
     private void buildUi() {
@@ -49,6 +61,7 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(Color.rgb(5, 8, 13));
 
         webView = new WebView(this);
+        webView.setBackgroundColor(Color.rgb(5, 8, 13));
         root.addView(webView, new FrameLayout.LayoutParams(-1, -1));
 
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
@@ -68,6 +81,7 @@ public class MainActivity extends Activity {
         TextView title = new TextView(this);
         title.setText("tribün360"); title.setTextColor(Color.WHITE); title.setTextSize(26); title.setGravity(Gravity.CENTER);
         TextView message = new TextView(this);
+        errorMessage = message;
         message.setText("Bağlantı kurulamadı.\nİnternet bağlantınızı kontrol edip tekrar deneyin.");
         message.setTextColor(Color.LTGRAY); message.setTextSize(16); message.setGravity(Gravity.CENTER); message.setPadding(0, dp(14), 0, dp(18));
         Button retry = new Button(this);
@@ -93,23 +107,41 @@ public class MainActivity extends Activity {
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) s.setSafeBrowsingEnabled(true);
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
 
         webView.addJavascriptInterface(new AndroidBridge(), "Tribun360Android");
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public void onProgressChanged(WebView view, int newProgress) {
                 progress.setProgress(newProgress);
-                progress.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
+                progress.setVisibility(loadFailed || newProgress >= 100 ? View.GONE : View.VISIBLE);
             }
         });
         webView.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (!request.isForMainFrame()) return false;
                 return handleNavigation(request.getUrl());
             }
+            @Override public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                beginLoading();
+            }
             @Override public void onPageFinished(WebView view, String url) {
-                if (errorView.getVisibility() != View.VISIBLE) webView.setVisibility(View.VISIBLE);
+                handler.removeCallbacks(loadTimeout);
+                progress.setVisibility(View.GONE);
+                if (!loadFailed) webView.setVisibility(View.VISIBLE);
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request.isForMainFrame()) showError();
+                if (request.isForMainFrame()) showError("Bağlantı kurulamadı (" + error.getErrorCode()
+                        + "). İnternet bağlantınızı kontrol edip tekrar deneyin.");
+            }
+            @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                if (request.isForMainFrame()) showError("Tribün360 sunucusuna ulaşıldı ancak sayfa açılamadı (HTTP "
+                        + response.getStatusCode() + "). Lütfen biraz sonra tekrar deneyin.");
+            }
+            @Override public void onReceivedSslError(WebView view, SslErrorHandler sslHandler, SslError error) {
+                sslHandler.cancel();
+                if (error.getUrl() != null && error.getUrl().equals(view.getUrl())) {
+                    showError("Güvenli bağlantı doğrulanamadı. Telefonun tarih ve saatini kontrol edin.");
+                }
             }
         });
 
@@ -141,14 +173,27 @@ public class MainActivity extends Activity {
         catch (Exception e) { Toast.makeText(this, "Bağlantı açılamadı", Toast.LENGTH_SHORT).show(); }
     }
 
-    private void showError() {
+    private void beginLoading() {
+        loadFailed = false;
+        errorView.setVisibility(View.GONE);
+        progress.setProgress(0);
+        progress.setVisibility(View.VISIBLE);
+        handler.removeCallbacks(loadTimeout);
+        handler.postDelayed(loadTimeout, 30000);
+    }
+
+    private void showError(String message) {
+        loadFailed = true;
+        handler.removeCallbacks(loadTimeout);
+        errorMessage.setText(message);
         webView.setVisibility(View.GONE);
         progress.setVisibility(View.GONE);
         errorView.setVisibility(View.VISIBLE);
     }
 
     private void retry() {
-        errorView.setVisibility(View.GONE);
+        webView.stopLoading();
+        beginLoading();
         webView.setVisibility(View.VISIBLE);
         webView.loadUrl(BuildConfig.TRIBUN360_URL);
     }
@@ -157,6 +202,7 @@ public class MainActivity extends Activity {
 
     @Override protected void onSaveInstanceState(Bundle outState) {
         webView.saveState(outState);
+        outState.putBoolean("loadFailed", loadFailed);
         super.onSaveInstanceState(outState);
     }
 
@@ -164,6 +210,14 @@ public class MainActivity extends Activity {
         if (errorView.getVisibility() == View.VISIBLE) { retry(); return; }
         if (webView != null && webView.canGoBack()) webView.goBack();
         else super.onBackPressed();
+    }
+
+    @Override protected void onDestroy() {
+        handler.removeCallbacksAndMessages(null);
+        webView.stopLoading();
+        webView.removeJavascriptInterface("Tribun360Android");
+        webView.destroy();
+        super.onDestroy();
     }
 
     public class AndroidBridge {
@@ -185,3 +239,4 @@ public class MainActivity extends Activity {
         @JavascriptInterface public String appVersion() { return BuildConfig.VERSION_NAME; }
     }
 }
+

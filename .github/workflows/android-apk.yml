@@ -72,30 +72,31 @@ jobs:
 
       - name: Prepare artifacts
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk tribun360-v1.1.0-debug.apk
-          cp android/app/build/outputs/bundle/release/app-release.aab tribun360-v1.1.0-release.aab
+          cp android/app/build/outputs/apk/debug/app-debug.apk tribun360-v1.1.1-debug.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab tribun360-v1.1.1-release.aab
           if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
-            cp android/app/build/outputs/apk/release/app-release.apk tribun360-v1.1.0-release.apk
+            cp android/app/build/outputs/apk/release/app-release.apk tribun360-v1.1.1-release.apk
           fi
           if [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
-            cp android/app/build/outputs/apk/release/app-release-unsigned.apk tribun360-v1.1.0-release-unsigned.apk
+            cp android/app/build/outputs/apk/release/app-release-unsigned.apk tribun360-v1.1.1-release-unsigned.apk
           fi
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: tribun360-android-v1.1.0
+          name: tribun360-android-v1.1.1
           path: |
-            tribun360-v1.1.0-debug.apk
-            tribun360-v1.1.0-release*.apk
-            tribun360-v1.1.0-release.aab
+            tribun360-v1.1.1-debug.apk
+            tribun360-v1.1.1-release*.apk
+            tribun360-v1.1.1-release.aab
           if-no-files-found: error
 
       - name: Publish installable beta APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete android-v1.1.0 --cleanup-tag -y || true
-          gh release create android-v1.1.0 tribun360-v1.1.0-debug.apk \
-            --title "tribün360 Android 1.1.0" \
-            --notes "Android V2: production URL, HTTPS-only WebView, adaptive icon, splash, offline screen, pull-to-refresh, secure external links, native share/notification bridge. Debug APK test kurulumu içindir. Play Store release signing için repository secrets gerekir."
+          # Keep previous releases available for rollback.
+          gh release create android-v1.1.1 tribun360-v1.1.1-debug.apk \
+            --title "tribün360 Android 1.1.1" \
+            --notes "Android 1.1.1: HTTP error screen, loading timeout, state restoration recovery and WebView diagnostics. Debug APK test kurulumu içindir. Play Store release signing için repository secrets gerekir."
+

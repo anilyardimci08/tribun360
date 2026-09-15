@@ -9,8 +9,8 @@ android {
         applicationId 'com.tribun360.app'
         minSdk 24
         targetSdk 35
-        versionCode 3
-        versionName '1.1.0'
+        versionCode 4
+        versionName '1.1.1'
         buildConfigField 'String', 'TRIBUN360_URL', '"https://tribun360.vercel.app/"'
     }
 
@@ -41,3 +41,4 @@ android {
         }
     }
 }
+
