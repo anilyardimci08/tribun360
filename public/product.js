@@ -50,7 +50,7 @@
   let currentMatch=null;
   function matchRow(m,stale=false){return `<button class="t360-match" data-match="${esc(m.id)}" data-league="${esc(m.league)}" aria-label="${esc(m.home.name)} - ${esc(m.away.name)} maç detayları"><span class="t360-side">${image(m.home.logo)}<span>${esc(m.home.name)}</span></span><span class="t360-score ${m.live&&!stale?'live':''}">${m.live||m.completed?`${esc(m.home.score??'—')} - ${esc(m.away.score??'—')}`:'VS'}<small>${stale?'Son kayıt':m.live?'● '+esc(m.clock):m.completed?'Maç sonu':esc(dateLabel(m.date))}</small></span><span class="t360-side"><span>${esc(m.away.name)}</span>${image(m.away.logo)}</span></button>`}
   function bindMatches(root){root.querySelectorAll('[data-match]').forEach(b=>b.onclick=()=>openMatch(b.dataset.match,b.dataset.league))}
-  function listCard(title,events,empty){return `<section class="t360-card"><h3>${esc(title)}</h3>${events.length?events.slice(0,6).map(matchRow).join(''):`<p>${esc(empty)}</p>`}</section>`}
+  function listCard(title,events,empty){return `<section class="t360-card"><h3>${esc(title)}</h3>${events.length?events.slice(0,6).map(m=>matchRow(m)).join(''):`<p>${esc(empty)}</p>`}</section>`}
   async function favoriteCard(force=false){
     if(!favorite){
       const legacy=localStorage.getItem('kullanici_favori_takim');
