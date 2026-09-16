@@ -151,17 +151,34 @@ function addDays(d, n) {
 }
 const SPORT_SCORE = 'https://sportscore.com/api/widget';
 
-// V63 normalized application schema
+const {appStat, appStandingsEntries, appStandings}=require('./lib/standings');
+
+// Normalized application schema
 const APP_LEAGUES=['tur.1','eng.1','esp.1','fra.1','ger.1','ita.1'];
 function appImg(v){return typeof v==='string'?v:(v?.href||v?.url||'')}
 function appN(v){const n=Number(String(v??0).replace(',','.').replace(/[^0-9.\-]/g,''));return Number.isFinite(n)?n:0}
-function appStat(e,names){const w=names.map(x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,''));for(const s of (e?.stats||[])){const k=[s?.name,s?.abbreviation,s?.displayName,s?.shortDisplayName].filter(Boolean).map(x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,''));if(k.some(a=>w.some(b=>a===b||a.includes(b)||b.includes(a))))return s?.value??s?.displayValue??0}return 0}
-function appStandingsEntries(d){const out=[],seen=new Set();(function walk(v){if(!v)return;if(Array.isArray(v)){v.forEach(walk);return}if(typeof v!=='object')return;if(v.team&&Array.isArray(v.stats)){const id=String(v.team.id||v.team.uid||v.team.displayName||'');if(id&&!seen.has(id)){seen.add(id);out.push(v)}}Object.values(v).forEach(x=>{if(x&&typeof x==='object')walk(x)})})(d);return out}
-function appStandings(d,league){return appStandingsEntries(d).map((e,i)=>{const t=e.team||{};return{rank:appN(appStat(e,['rank','position']))||i+1,teamId:String(t.id||t.uid||''),name:t.displayName||t.name||'',shortName:t.shortDisplayName||t.abbreviation||'',logo:appImg(t.logos?.[0])||appImg(t.logo),played:appN(appStat(e,['gamesplayed','played','gp'])),wins:appN(appStat(e,['wins','w'])),draws:appN(appStat(e,['ties','draws','d'])),losses:appN(appStat(e,['losses','l'])),gf:appN(appStat(e,['pointsfor','goalsfor','gf','f'])),ga:appN(appStat(e,['pointsagainst','goalsagainst','ga','a'])),gd:appN(appStat(e,['pointdifferential','goaldifference','gd'])),points:appN(appStat(e,['points','pts','p'])),league}})}
 function appEvent(ev,league){const c=ev?.competitions?.[0]||{},a=Array.isArray(c.competitors)?c.competitors:[],h=a.find(x=>x.homeAway==='home')||a[0]||{},w=a.find(x=>x.homeAway==='away')||a[1]||{},st=ev?.status?.type||{};return{id:String(ev?.id||''),league,date:ev?.date||'',state:st.state||'',completed:!!st.completed,live:st.state==='in',clock:ev?.status?.displayClock||st.shortDetail||st.detail||'',home:{id:String(h?.team?.id||''),name:h?.team?.displayName||h?.team?.name||'',logo:appImg(h?.team?.logo)||appImg(h?.team?.logos?.[0]),score:h?.score?.displayValue??h?.score??null},away:{id:String(w?.team?.id||''),name:w?.team?.displayName||w?.team?.name||'',logo:appImg(w?.team?.logo)||appImg(w?.team?.logos?.[0]),score:w?.score?.displayValue??w?.score??null}}}
 function appTeams(d,league){const raw=d?.sports?.[0]?.leagues?.[0]?.teams||d?.teams||[];return(Array.isArray(raw)?raw:[]).map(x=>x?.team||x).filter(Boolean).map(t=>({id:String(t.id||t.uid||''),league,name:t.displayName||t.name||'',shortName:t.shortDisplayName||t.abbreviation||'',logo:appImg(t.logos?.[0])||appImg(t.logo)})).filter(x=>x.id&&x.name)}
-async function appRows(league){const now=new Date(),season=now.getUTCMonth()>=6?now.getUTCFullYear():now.getUTCFullYear()-1;const d=await tryGetJson(`${ESPN_V2}/${league}/standings?season=${season}`)||await tryGetJson(`${ESPN_V2}/${league}/standings`);return appStandings(d||{},league)}
-async function appFixtures(league,b=14,f=45){const now=new Date(),d=await tryGetJson(`${ESPN_SITE}/${league}/scoreboard?dates=${ymd(addDays(now,-b))}-${ymd(addDays(now,f))}&limit=300`);return(d?.events||[]).map(x=>appEvent(x,league)).sort((a,b)=>String(a.date).localeCompare(String(b.date)))}
+async function appRows(league){const now=new Date(),season=now.getUTCMonth()>=6?now.getUTCFullYear():now.getUTCFullYear()-1;const d=await tryGetJson(`${ESPN_V2}/${league}/standings?season=${season}`)||await tryGetJson(`${ESPN_V2}/${league}/standings`);if(!d)throw Error('Puan kaynağına ulaşılamadı');return appStandings(d,league)}
+async function fixtureEvents(league,start,end){
+  const today=ymd(new Date());
+  return require('./lib/fixtures').fixturesInRange(start,end,async dates=>{
+    const key=`fixtures-day:${league}:${dates}`,ttl=dates===today?20000:600000,hit=cacheGet(key,ttl);
+    if(hit)return hit;
+    const result=await getJson(`${ESPN_SITE}/${league}/scoreboard?dates=${dates}&limit=300`);
+    if(!Array.isArray(result.events))throw Error('Maç kaynağı geçersiz yanıt verdi');
+    return cacheSet(key,result);
+  },async()=>{
+    const key=`fixture-calendar:${league}`;
+    const d=cacheGet(key,600000)||cacheSet(key,await getJson(`${ESPN_SITE}/${league}/scoreboard`));
+    const l=d.leagues?.[0],date=s=>String(s||'').slice(0,10).replace(/-/g,'');
+    return l?.calendarIsWhitelist&&l.calendarType==='day'&&Array.isArray(l.calendar)&&date(l.calendarStartDate)<=start&&date(l.calendarEndDate)>=end?l.calendar.map(date):null;
+  });
+  }
+async function appFixtures(league,b=14,f=45){
+  const now=new Date(),events=await fixtureEvents(league,ymd(addDays(now,-b)),ymd(addDays(now,f)));
+  return events.map(x=>appEvent(x,league)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+}
 async function appLiveAll(){const p=await Promise.all(APP_LEAGUES.map(async l=>{const d=await tryGetJson(`${ESPN_SITE}/${l}/scoreboard`);return(d?.events||[]).map(x=>appEvent(x,l)).filter(x=>x.live)}));return p.flat()}
 
 
@@ -449,10 +466,9 @@ async function handleApi(req, res, url) {
         }
 
         if (merged.size === 0) {
-          const start = ymd(addDays(today, -21));
-          const end = ymd(addDays(today, 75));
-          const fallback = await tryGetJson(`${ESPN_SITE}/${league}/scoreboard?dates=${start}-${end}&limit=300`);
-          const events = Array.isArray(fallback?.events) ? fallback.events : [];
+          const start = ymd(seasonStart);
+          const end = ymd(seasonEnd);
+          const events = await fixtureEvents(league,start,end);
           for (const ev of events) if (ev?.id) merged.set(String(ev.id), ev);
         }
 
@@ -479,7 +495,7 @@ async function handleApi(req, res, url) {
       const key = `fixtures:${league}:${range}`;
       const cached = cacheGet(key, 20000);
       if (cached) return sendJson(res, 200, cached);
-      const data = await getJson(`${ESPN_SITE}/${league}/scoreboard?dates=${encodeURIComponent(range)}&limit=200`);
+      const data = {events:await fixtureEvents(league,start,end)};
       cacheSet(key, data);
       return sendJson(res, 200, data);
     }

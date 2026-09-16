@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+    <script src="/data-client.js?v=123"></script>
+    <link rel="stylesheet" href="/product.css?v=123">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
     <meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
@@ -4203,7 +4205,7 @@ sistemiUygula(kullaniciTercihleri.tema, kullaniciTercihleri.dil, kullaniciTercih
         <div class="v8-bottom"><span class="v8-chip">${m.isLive?'CANLI':(m.start?esc(m.displayStatus):'GELECEK MAÇ')}</span><span>${m.isLive?'Maç devam ediyor':(m.start?('📅 '+esc(m.displayStatus)):(m.raw?.roundInfo?.round?m.raw.roundInfo.round+'. Hafta':'Süper Lig'))}</span></div>
       </article>`;
     }).join('');
-    meta.textContent=live.length?`${live.length} canlı maç • ${upcoming.length} yaklaşan maç • ${lastSync||''}`:`Canlı maç yok • ${upcoming.length} yaklaşan Süper Lig maçı • ${lastSync||''}`;
+    if(meta) meta.textContent=live.length?`${live.length} canlı maç • ${upcoming.length} yaklaşan maç • ${lastSync||''}`:`Canlı maç yok • ${upcoming.length} yaklaşan Süper Lig maçı • ${lastSync||''}`;
   }
   function renderFallback(){
     matches=upcomingFallback.map((x,i)=>{
@@ -5847,7 +5849,7 @@ sistemiUygula(kullaniciTercihleri.tema, kullaniciTercihleri.dil, kullaniciTercih
     return weeks;
   }
   function v41FixtureRow(m,lg){
-    const sc=m.homeScore!=null&&m.awayScore!=null?`${m.homeScore} - ${m.awayScore}`:'VS';
+    const sc=(m.isLive||m.completed)&&m.homeScore!=null&&m.awayScore!=null?`${m.homeScore} - ${m.awayScore}`:'VS';
     const tm=m.start?new Date(m.start).toLocaleTimeString('tr-TR',{timeZone:'Europe/Istanbul',hour:'2-digit',minute:'2-digit'}):'—';
     const dt=m.start?new Date(m.start).toLocaleDateString('tr-TR',{timeZone:'Europe/Istanbul',day:'2-digit',month:'short'}):'';
     return `<div class="v32-fixture-row" onclick="window.v32OpenFixture('${m.id}')"><div class="v32-fixture-team">${logo(m.logoH,m.home)}<span>${esc(m.home)}</span></div><div class="v32-fixture-center"><b>${sc}</b><span class="${m.isLive?'live':''}">${m.isLive?'🔴 '+esc(m.displayStatus):(m.completed?'MS':tm)}</span><span class="v41-fixture-date">${esc(dt)}</span></div><div class="v32-fixture-team away"><span>${esc(m.away)}</span>${logo(m.logoA,m.away)}</div></div>`;
@@ -5930,7 +5932,7 @@ sistemiUygula(kullaniciTercihleri.tema, kullaniciTercihleri.dil, kullaniciTercih
     if(meta)meta.textContent=LEAGUES[lg].name+' verisi yükleniyor…';
 
     if(aktifFiltre==='TABLE'){
-      renderTable(true);
+      window.v32RenderTable(true);
     }else if(aktifFiltre==='FIXTURE'){
       renderFixture(true);
     }else if(aktifFiltre==='FAV'){
@@ -6025,9 +6027,9 @@ sistemiUygula(kullaniciTercihleri.tema, kullaniciTercihleri.dil, kullaniciTercih
     if(window.v33SyncLeagueButtons)window.v33SyncLeagueButtons();
   };
 
-  const prev=window.ekraniCiz;window.ekraniCiz=function(){if(aktifFiltre==='TABLE'){renderTable();return}if(aktifFiltre==='FIXTURE'){renderFixture();return}if(aktifFiltre==='FAV'){window.v32RenderFavorites(false);return}if(aktifFiltre==='KADRO'){if(window.v32ActiveLeague==='tur.1')window.v38RenderSuperSquads();else if(window.v60RenderLeagueSquads)window.v60RenderLeagueSquads();return}return prev?prev():undefined};
+  const prev=window.ekraniCiz;window.ekraniCiz=function(){if(aktifFiltre==='TABLE'){window.v32RenderTable();return}if(aktifFiltre==='FIXTURE'){renderFixture();return}if(aktifFiltre==='FAV'){window.v32RenderFavorites(false);return}if(aktifFiltre==='KADRO'){if(window.v32ActiveLeague==='tur.1')window.v38RenderSuperSquads();else if(window.v60RenderLeagueSquads)window.v60RenderLeagueSquads();return}return prev?prev():undefined};
 
-  async function tick(){if(!document.hidden){if(aktifFiltre==='TABLE')renderTable(true);else if(aktifFiltre==='FIXTURE')renderFixture(true);else if(aktifFiltre==='FAV')window.v32RenderFavorites(true)}setTimeout(tick,20000)}
+  async function tick(){if(!document.hidden){if(aktifFiltre==='TABLE')window.v32RenderTable(true);else if(aktifFiltre==='FIXTURE')renderFixture(true);else if(aktifFiltre==='FAV')window.v32RenderFavorites(true)}setTimeout(tick,20000)}
   document.addEventListener('DOMContentLoaded',()=>{updateUI();renderFavoriteSettings();setTimeout(()=>{if(window.v32ActiveLeague!=='tur.1'&&window.v32RefreshLive)window.v32RefreshLive()},350);setTimeout(tick,20000)});
 })();
 </script>
@@ -6149,27 +6151,6 @@ sistemiUygula(kullaniciTercihleri.tema, kullaniciTercihleri.dil, kullaniciTercih
    return out.filter((x,i,a)=>x.team?.displayName&&a.findIndex(y=>y.team?.id===x.team?.id)===i);
  }
  function stVal(e,names){for(const s of arr(e?.stats)){const k=String(s?.name||s?.abbreviation||s?.displayName||'').toLowerCase();if(names.some(n=>k===n||k.includes(n)))return s?.displayValue??s?.value}return null}
-
- // ---- favorite dashboard ----
- async function renderFavHome(){
-   if(typeof aktifFiltre!=='undefined'&&aktifFiltre!=='LIVE')return;
-   const host=document.getElementById('liveSourceV8');if(!host||document.getElementById('v40FavHome'))return;
-   const fav=window.kullaniciTercihleri?.favori||localStorage.getItem('kullanici_favori_takim');if(!fav)return;
-   const box=document.createElement('div');box.id='v40FavHome';box.className='v40-fav-home';box.innerHTML='<div class="v32-status-note">Favori takım merkezi hazırlanıyor…</div>';
-   const grid=document.getElementById('v8Grid'); if(grid)host.insertBefore(box,grid); else host.prepend(box);
-   try{
-     const league='tur.1', fx=await getSeasonFixtures(league), now=Date.now();
-     const mine=fx.filter(ev=>eventTeams(ev).some(t=>fold(t.name)===fold(fav)||fold(t.name).includes(fold(fav))||fold(fav).includes(fold(t.name))));
-     const past=mine.filter(e=>new Date(e.date).getTime()<now&&e.status?.type?.completed).sort((a,b)=>new Date(b.date)-new Date(a.date));
-     const next=mine.filter(e=>new Date(e.date).getTime()>=now&&!e.status?.type?.completed).sort((a,b)=>new Date(a.date)-new Date(b.date))[0];
-     const form=past.slice(0,5).map(e=>resultForTeam(e,fav)).filter(Boolean);
-     let rank='—',pts='—',logo='';
-     try{const rows=await getStandRows(league),r=rows.find(x=>fold(x.team?.displayName)===fold(fav)||fold(x.team?.displayName).includes(fold(fav)));if(r){rank=stVal(r,['rank','position'])||'—';pts=stVal(r,['points','pts'])||'—';logo=img(r.team?.logos?.[0])||img(r.team?.logo)}}catch(e){}
-     let nextHtml='Sıradaki maç bulunamadı.';
-     if(next){const ts=eventTeams(next), h=ts.find(x=>x.homeAway==='home')||ts[0],a=ts.find(x=>x.homeAway==='away')||ts[1];nextHtml=`<b>${esc(h?.name)} - ${esc(a?.name)}</b><span>${new Date(next.date).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul',day:'2-digit',month:'long',hour:'2-digit',minute:'2-digit'})}</span>`}
-     box.innerHTML=`<div class="v40-fav-head"><div class="v40-fav-team">${logo?`<img src="${esc(logo)}">`:''}<div><h3>⭐ ${esc(fav.replace(' A.Ş.',''))}</h3><span>${rank}. sıra • ${pts} puan</span></div></div>${formHtml(form)}</div><div class="v40-fav-next">${nextHtml}</div>`;
-   }catch(e){box.innerHTML='<div class="v32-status-note">Favori takım merkezi veri bekliyor.</div>'}
- }
 
  // ---- leader parser ----
  function leaderRows(data){
@@ -6345,10 +6326,6 @@ sistemiUygula(kullaniciTercihleri.tema, kullaniciTercihleri.dil, kullaniciTercih
    }catch(e){}
  };
 
- // Initial favorite home + rerender observer.
- document.addEventListener('DOMContentLoaded',()=>setTimeout(renderFavHome,900));
- const obs=new MutationObserver(()=>{if(typeof aktifFiltre!=='undefined'&&aktifFiltre==='LIVE'&&!document.getElementById('v40FavHome'))setTimeout(renderFavHome,100)});
- document.addEventListener('DOMContentLoaded',()=>{const h=document.getElementById('liveSourceV8');if(h)obs.observe(h,{childList:true,subtree:false})});
 })();
 </script>
 
@@ -6392,7 +6369,7 @@ sistemiUygula(kullaniciTercihleri.tema, kullaniciTercihleri.dil, kullaniciTercih
     const wanted=names.map(x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,''));
     for(const st of (Array.isArray(e?.stats)?e.stats:[])){
       const keys=[st?.name,st?.abbreviation,st?.displayName,st?.shortDisplayName].filter(Boolean).map(x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,''));
-      if(keys.some(k=>wanted.some(w=>k===w||k.includes(w)||w.includes(k)))) return st?.displayValue??st?.value??st?.summary??0;
+      if(keys.some(k=>wanted.some(w=>k===w))) return st?.displayValue??st?.value??st?.summary??0;
     }
     return 0;
   }
@@ -6478,7 +6455,7 @@ sistemiUygula(kullaniciTercihleri.tema, kullaniciTercihleri.dil, kullaniciTercih
  const LG=()=>window.v32ActiveLeague||'tur.1';
  const LN=l=>((window.T360_LEAGUES||{})[l]?.name||'Lig');
  async function A(url){const r=await fetch(url+(url.includes('?')?'&':'?')+'_='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
- function SV(e,names){const W=names.map(x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,''));for(const st of (Array.isArray(e?.stats)?e.stats:[])){const K=[st?.name,st?.abbreviation,st?.displayName,st?.shortDisplayName].filter(Boolean).map(x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,''));if(K.some(k=>W.some(w=>k===w||k.includes(w)||w.includes(k))))return st?.displayValue??st?.value??0}return 0}
+ function SV(e,names){const W=names.map(x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,''));for(const st of (Array.isArray(e?.stats)?e.stats:[])){const K=[st?.name,st?.abbreviation,st?.displayName,st?.shortDisplayName].filter(Boolean).map(x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,''));if(K.some(k=>W.some(w=>k===w)))return st?.displayValue??st?.value??0}return 0}
  function SE(d){const o=[],seen=new Set();const w=v=>{if(!v)return;if(Array.isArray(v)){v.forEach(w);return}if(typeof v!=='object')return;if(v.team&&Array.isArray(v.stats)){const id=String(v.team.id||v.team.uid||v.team.displayName||'');if(id&&!seen.has(id)){seen.add(id);o.push(v)}}Object.values(v).forEach(x=>{if(x&&typeof x==='object')w(x)})};w(d);return o}
  function LR(d){const o=[],seen=new Set();const w=(v,p=[])=>{if(v==null)return;if(Array.isArray(v)){v.forEach(x=>w(x,p));return}if(typeof v!=='object')return;const a=v.athlete||v.player||v.competitor,n=a?.displayName||a?.fullName||a?.name||v?.displayName||v?.name,id=a?.id||v?.athleteId||v?.playerId||v?.id,val=v?.value??v?.displayValue??v?.statValue??v?.total;if(n&&id&&val!=null&&Number.isFinite(Number(String(val).replace(',','.')))){const k=String(id)+'|'+p.join('.');if(!seen.has(k)){seen.add(k);o.push({id:String(id),name:n,value:val,photo:I(a?.headshot),team:v?.team?.displayName||v?.team?.name||'',path:p.join(' ').toLowerCase()})}}for(const [k,x] of Object.entries(v))if(x&&typeof x==='object')w(x,p.concat(k))};w(d);return o}
  function PL(rows,type){const rx=type==='assist'?/assist/:/goal|scor/;return rows.filter(x=>rx.test(x.path)).sort((a,b)=>(Number(b.value)||0)-(Number(a.value)||0)).filter((x,i,z)=>z.findIndex(q=>q.id===x.id)===i).slice(0,5)}
@@ -6531,7 +6508,7 @@ sistemiUygula(kullaniciTercihleri.tema, kullaniciTercihleri.dil, kullaniciTercih
  function teamStat(team,names){
    const wanted=names.map(x=>x.toLowerCase().replace(/[^a-z0-9]/g,''));
    for(const st of (Array.isArray(team?.statistics)?team.statistics:[])){
-     const k=statKey(st);if(wanted.some(w=>k===w||k.includes(w)||w.includes(k)))return st?.displayValue??st?.value??'—'
+     const k=statKey(st);if(wanted.some(w=>k===w))return st?.displayValue??st?.value??'—'
    }return '—'
  }
  function num(v){const n=Number(String(v??'').replace('%','').replace(',','.'));return Number.isFinite(n)?n:0}
@@ -6622,39 +6599,7 @@ sistemiUygula(kullaniciTercihleri.tema, kullaniciTercihleri.dil, kullaniciTercih
   const mo=new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes){if(n.nodeType!==1)continue;if(n.tagName==='IMG')tuneImg(n);n.querySelectorAll?.('img').forEach(tuneImg)}});
   mo.observe(document.documentElement,{childList:true,subtree:true});
 
-  // Aynı GET isteğinin çok kısa aralıkta birden fazla UI modülü tarafından gönderilmesini birleştirir.
-  // API cevabını değiştirmez; sadece eşzamanlı duplicate istekleri azaltır.
-  const realFetch=window.fetch.bind(window), inflight=new Map();
-  window.fetch=function(input,init){
-    try{
-      const method=String(init?.method||'GET').toUpperCase();
-      const raw=typeof input==='string'?input:input?.url;
-      const u=new URL(raw,location.href);
-      if(method==='GET' && u.origin===location.origin && u.pathname.startsWith('/api/')){
-        // Cache-buster parametreleri aynı mantıksal istek için normalize edilir.
-        u.searchParams.delete('_');u.searchParams.delete('ts');
-        const key=u.pathname+'?'+[...u.searchParams.entries()].sort().map(x=>x.join('=')).join('&');
-        if(inflight.has(key))return inflight.get(key).then(r=>r.clone());
-        const p=realFetch(input,init).then(r=>{setTimeout(()=>inflight.delete(key),250);return r}).catch(e=>{inflight.delete(key);throw e});
-        inflight.set(key,p);return p.then(r=>r.clone());
-      }
-    }catch(e){}
-    return realFetch(input,init);
-  };
-
-  // Uygulama açıldıktan sonra düşük öncelikte temel verileri ısıtır; sekmeler daha hızlı açılır.
-  const idle=window.requestIdleCallback||function(fn){return setTimeout(fn,1200)};
-  idle(()=>{
-    if(document.hidden)return;
-    const urls=[];
-    for(const l of ['tur.1','eng.1','esp.1','fra.1','ger.1','ita.1']){
-      urls.push('/api/scoreboard?league='+l,'/api/standings?league='+l,'/api/teams?league='+l);
-    }
-    let i=0;
-    const next=()=>{if(document.hidden||i>=urls.length)return;realFetch(urls[i++],{cache:'no-store'}).catch(()=>{}).finally(()=>setTimeout(next,180));};
-    next();
-  });
-
+  // Requests are shared by data-client.js; load only data for the active view.
   // Hidden sekmede gereksiz animasyon/işlem yok; geri dönünce canlı ekran kendi timerlarıyla devam eder.
   document.addEventListener('visibilitychange',()=>{document.documentElement.classList.toggle('v47-hidden',document.hidden)});
 })();
@@ -6831,19 +6776,7 @@ sistemiUygula(kullaniciTercihleri.tema, kullaniciTercihleri.dil, kullaniciTercih
 
 
 
-<script id="t360-v60-live-ticker">
-(function(){
-'use strict';
-const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const league=()=>window.v32ActiveLeague||'tur.1';
-const meta=lg=>(window.T360_LEAGUES||{})[lg]||{name:'Lig'};
-function live(ev){const t=ev?.status?.type||{};return t.state==='in'||(!t.completed&&!/pre/i.test(String(t.state||''))&&/in progress|half|extra|penalt|live/i.test(String(t.description||t.detail||t.name||'')))}
-function txt(ev){const c=ev?.competitions?.[0]||{},a=Array.isArray(c.competitors)?c.competitors:[],h=a.find(x=>x.homeAway==='home')||a[0]||{},w=a.find(x=>x.homeAway==='away')||a[1]||{},hn=h?.team?.displayName||h?.team?.name||'Ev Sahibi',an=w?.team?.displayName||w?.team?.name||'Deplasman',hs=h?.score?.displayValue??h?.score??0,as=w?.score?.displayValue??w?.score??0,clk=ev?.status?.displayClock||ev?.status?.type?.shortDetail||ev?.status?.type?.detail||'CANLI';return `<span class="t360-ticker-live">● ${E(clk)}</span> ${E(hn)} <b>${E(hs)} - ${E(as)}</b> ${E(an)}`}
-async function refresh(){const el=document.getElementById('t360TickerTrack');if(!el)return;const lg=league();let parts=[];try{const r=await fetch('/api/scoreboard?league='+encodeURIComponent(lg)+'&_='+Date.now(),{cache:'no-store'});if(r.ok){const d=await r.json();parts=(Array.isArray(d?.events)?d.events:[]).filter(live).slice(0,8).map(txt)}}catch(e){}const box=document.getElementById('t360LiveTicker');if(!parts.length){document.body.classList.remove('t360-has-live-ticker');if(box)box.style.display='none';el.innerHTML='';return;}el.innerHTML=parts.join('<span class="t360-ticker-sep">◆</span>');document.body.classList.add('t360-has-live-ticker');if(box&&!document.body.classList.contains('t360-settings-open'))box.style.display='grid';el.style.animation='none';void el.offsetWidth;el.style.animation=''}
-window.t360RefreshTicker=refresh;
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refresh);else refresh();window.addEventListener('load',refresh);setInterval(()=>{if(!document.hidden)refresh()},15000);
-})();
-</script>
+
 
 
 
@@ -6909,22 +6842,7 @@ const prev=window.ekraniCiz;window.ekraniCiz=function(){if(typeof aktifFiltre!==
 const b=document.getElementById('v39PremierTestBtn');if(b)b.textContent='⚽ Aktif Lig Testi';if(window.v33SyncLeagueButtons)window.v33SyncLeagueButtons();})();
 </script>
 
-<script id="t360-v63-product-features">
-(function(){'use strict';
-const defs=window.T360_LEAGUES||{},E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),J=async u=>{const r=await fetch(u+(u.includes('?')?'&':'?')+'_='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()},lg=()=>window.v32ActiveLeague||'tur.1';
-function isHome(){try{return typeof aktifFiltre!=='undefined'&&aktifFiltre==='LIVE'}catch(e){return true}}function fd(x){try{return new Date(x).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}catch(e){return ''}}
-window.t360Error=(a,b,r)=>`<div class="t360-error-card"><b>${E(a)}</b><span>${E(b)}</span>${r?`<div style="margin-top:8px"><button class="v32-refresh" onclick="${r}">↻ Tekrar Dene</button></div>`:''}</div>`;
-let mode='today';window.t360HomeMode=m=>{mode=m;home(true)};function mr(m){return `<div class="t360-mini-match" data-match="${E(m.id)}"><b>${E(m.home.name)}</b><div class="t360-mini-mid ${m.live?'t360-mini-live':''}">${m.live?'● '+E(m.clock):(m.completed?`${E(m.home.score??0)} - ${E(m.away.score??0)}`:fd(m.date))}</div><b class="away">${E(m.away.name)}</b></div>`}
-async function home(){const b=document.getElementById('t360HomeCenter');if(!b)return;if(!isHome()){b.style.display='none';return}b.style.display='block';b.innerHTML='<div class="t360-skeleton-line"></div><div class="t360-skeleton-line" style="margin-top:8px;width:70%"></div>';try{const league=lg(),[fx,st]=await Promise.all([J('/api/app/fixtures?league='+league+'&daysBack=8&daysForward=28'),J('/api/app/standings?league='+league)]),ev=fx.events||[],today=new Date().toISOString().slice(0,10),now=Date.now(),live=ev.filter(x=>x.live),tod=ev.filter(x=>String(x.date).slice(0,10)===today),up=ev.filter(x=>!x.completed&&!x.live&&new Date(x.date).getTime()>now).slice(0,5),list=mode==='live'?live:mode==='upcoming'?up:tod,fav=localStorage.getItem('kullanici_favori_takim')||'',row=(st.rows||[]).find(x=>fav&&(x.name.includes(fav)||fav.includes(x.name))),fm=ev.filter(x=>fav&&(x.home.name.includes(fav)||x.away.name.includes(fav))),next=fm.find(x=>!x.completed&&!x.live&&new Date(x.date)>new Date());b.innerHTML=`<div class="t360-home-tabs"><button class="t360-home-tab-btn ${mode==='today'?'active':''}" onclick="t360HomeMode('today')">Bugün</button><button class="t360-home-tab-btn ${mode==='live'?'active':''}" onclick="t360HomeMode('live')">Canlı${live.length?' ('+live.length+')':''}</button><button class="t360-home-tab-btn ${mode==='upcoming'?'active':''}" onclick="t360HomeMode('upcoming')">Yaklaşan</button></div><div class="t360-home-grid"><div class="t360-mini-card"><h4>${E(defs[league]?.name||'Lig')}</h4>${list.slice(0,5).map(mr).join('')||'<div class="t360-empty-state">Bu bölümde maç yok.</div>'}</div><div class="t360-mini-card"><h4>⭐ Favori Takım</h4>${fav?`<div class="t360-fav-card">${row?.logo?`<img src="${E(row.logo)}">`:''}<div><strong>${E(fav)}</strong><small>${row?`${row.rank}. sıra • ${row.points} puan`:''}</small>${next?`<small>Sonraki: ${E(next.home.name)} - ${E(next.away.name)} • ${fd(next.date)}</small>`:''}</div></div>`:'<div class="t360-empty-state">Favori takım seçilmedi.</div>'}</div></div>`;b.querySelectorAll('[data-match]').forEach(x=>x.addEventListener('click',()=>window.__openV8?.(x.dataset.match)))}catch(e){b.innerHTML=window.t360Error('Ana sayfa verisi alınamadı','Bağlantı geçici olarak kullanılamıyor.','window.t360RenderHome()')}}window.t360RenderHome=home;
-async function ticker(){const box=document.getElementById('t360LiveTicker'),el=document.getElementById('t360TickerTrack');if(!box||!el)return;try{const d=await J('/api/app/live-all'),ev=d.events||[];if(!ev.length){document.body.classList.remove('t360-has-live-ticker');box.style.display='none';return}document.body.classList.add('t360-has-live-ticker');if(!document.body.classList.contains('t360-settings-open'))box.style.display='grid';el.innerHTML=ev.slice(0,12).map(m=>`<span class="t360-ticker-live">● ${E(m.clock||'CANLI')}</span> <small>${E(defs[m.league]?.name||'')}</small> ${E(m.home.name)} <b>${E(m.home.score??0)} - ${E(m.away.score??0)}</b> ${E(m.away.name)}`).join('<span class="t360-ticker-sep">◆</span>')}catch(e){}}window.t360RefreshTicker=ticker;setInterval(()=>{if(!document.hidden)ticker()},15000);
-let st=null;window.t360OpenSearch=()=>{document.getElementById('t360SearchModal').style.display='grid';const i=document.getElementById('t360SearchInput');i.value='';setTimeout(()=>i.focus(),50)};window.t360CloseSearch=()=>document.getElementById('t360SearchModal').style.display='none';const inp=document.getElementById('t360SearchInput');inp?.addEventListener('input',()=>{clearTimeout(st);const q=inp.value.trim(),r=document.getElementById('t360SearchResults');if(q.length<2){r.innerHTML='<div class="t360-empty-state">En az 2 harf yazın.</div>';return}r.innerHTML='<div class="t360-skeleton-line"></div>';st=setTimeout(async()=>{try{const d=await J('/api/app/search?q='+encodeURIComponent(q));r.innerHTML=(d.results||[]).map(t=>`<button class="t360-search-result" data-team="${E(t.name)}" data-league="${E(t.league)}">${t.logo?`<img src="${E(t.logo)}">`:'⚽'}<div><b>${E(t.name)}</b><span>${E(defs[t.league]?.name||t.league)}</span></div></button>`).join('')||'<div class="t360-empty-state">Sonuç yok.</div>';r.querySelectorAll('[data-team]').forEach(b=>b.addEventListener('click',()=>{window.v32ActiveLeague=b.dataset.league;localStorage.setItem('cmm_v32_league',b.dataset.league);document.body.dataset.t360League=b.dataset.league;window.t360CloseSearch();window.v40OpenTeam?window.v40OpenTeam(b.dataset.team,b.dataset.league):window.v30OpenTeam?.(b.dataset.team)}))}catch(e){r.innerHTML=window.t360Error('Arama yapılamadı','Sunucu bağlantısını kontrol edin.')}} ,250)});
-const oo=window.__openV8;if(typeof oo==='function')window.__openV8=async function(id){const x=await oo.apply(this,arguments);try{const d=await J('/api/summary?league='+lg()+'&id='+encodeURIComponent(id)),st=d?.header?.competitions?.[0]?.status?.type||d?.header?.status?.type||{},m=st.state==='in'?'live':st.completed?'done':'pre',txt=m==='live'?'🔴 CANLI MAÇ • olaylar ve istatistikler güncellenir':m==='done'?'✅ MAÇ SONU • skor özeti ve performans':'⏱ MAÇ ÖNCESİ • form, kadro ve hazırlık';let t=document.getElementById('t360MatchMode');if(!t){t=document.createElement('div');t.id='t360MatchMode';document.getElementById('v30DetailHeader')?.insertAdjacentElement('afterend',t)}t.className='t360-match-mode '+m;t.textContent=txt}catch(e){}return x};
-const os=window.v32SetLeague;if(typeof os==='function')window.v32SetLeague=function(){const x=os.apply(this,arguments);document.body.dataset.t360League=lg();setTimeout(()=>{if(isHome())home()},70);ticker();return x};
-const of=window.v32RenderFavorites;if(typeof of==='function')window.v32RenderFavorites=async function(force){await of(force);const c=document.getElementById('match-list'),fav=localStorage.getItem('kullanici_favori_takim')||'';if(!c||!fav)return;try{const [st,fx]=await Promise.all([J('/api/app/standings?league=tur.1'),J('/api/app/fixtures?league=tur.1&daysBack=45&daysForward=45')]),row=(st.rows||[]).find(x=>x.name.includes(fav)||fav.includes(x.name)),ms=(fx.events||[]).filter(x=>x.home.name.includes(fav)||x.away.name.includes(fav)),past=ms.filter(x=>x.completed).slice(-5),next=ms.find(x=>!x.completed&&!x.live&&new Date(x.date)>new Date()),form=past.map(m=>{const h=m.home.name.includes(fav),a=Number(h?m.home.score:m.away.score),b=Number(h?m.away.score:m.home.score);return a>b?'G':a===b?'B':'M'});c.insertAdjacentHTML('afterbegin',`<div class="t360-mini-card" style="margin-bottom:10px"><h4>⭐ ${E(fav)} Merkezi</h4><div class="t360-fav-card">${row?.logo?`<img src="${E(row.logo)}">`:''}<div><strong>${E(fav)}</strong><small>${row?`${row.rank}. sıra • ${row.points} puan • ${row.gd>=0?'+':''}${row.gd} averaj`:''}</small>${next?`<small>Sonraki: ${E(next.home.name)} - ${E(next.away.name)} • ${fd(next.date)}</small>`:''}<div class="t360-form">${form.map(x=>`<i>${x}</i>`).join('')}</div></div></div></div>`)}catch(e){}};
-const nav=[...document.querySelectorAll('.bottom-nav .nav-item:not(#navSettingsBtn)')];let sx=0,sy=0,ts=0;const p=document.createElement('div');p.className='t360-pull';p.textContent='↻ Yenile';document.body.appendChild(p);document.addEventListener('touchstart',e=>{if(e.touches.length===1){sx=e.touches[0].clientX;sy=e.touches[0].clientY;ts=Date.now()}},{passive:true});document.addEventListener('touchend',e=>{const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;if(Date.now()-ts<700&&Math.abs(dx)>85&&Math.abs(dx)>Math.abs(dy)*1.5&&!e.target.closest('button,input,select,.v60-six-switch')){const a=Math.max(0,nav.findIndex(b=>b.classList.contains('active'))),n=dx<0?Math.min(nav.length-1,a+1):Math.max(0,a-1);nav[n]?.click()}if(window.scrollY<8&&dy>80&&Math.abs(dy)>Math.abs(dx)){p.classList.add('show');setTimeout(()=>{p.classList.remove('show');if(isHome()){window.v32RefreshLive?.();home();ticker()}else if(typeof aktifFiltre!=='undefined'&&aktifFiltre==='TABLE')window.v32RenderTable?.(true);else if(aktifFiltre==='FIXTURE')window.v32RenderFixture?.(true);else if(aktifFiltre==='KADRO')window.v60RenderLeagueSquads?.(true);else if(aktifFiltre==='V31_STATS')window.v31OpenStatsCenter?.()},350)}},{passive:true});
-document.querySelectorAll('.bottom-nav .nav-item').forEach(b=>b.addEventListener('click',()=>setTimeout(()=>{const h=document.getElementById('t360HomeCenter');if(h)h.style.display=isHome()?'block':'none';if(isHome())home()},100)));document.body.dataset.t360League=lg();if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{home();ticker()});else{home();ticker()}
-})();
-</script>
+<script src="/product.js?v=123"></script>
 
 </body>
 </html>
